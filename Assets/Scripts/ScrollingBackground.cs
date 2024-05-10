@@ -12,6 +12,14 @@ public class ScrollingBackground : MonoBehaviour
     private float spriteWidth; // Width of each sprite
     private bool scrollingToRight = false; // Initially scrolling to the left
     private bool isWrapping = false;
+    private Coroutine currentWrapCoroutine = null;
+    private Vector3 cameraInitialPosition;
+    private enum Direction
+    {
+        Left = 0,
+        Right = 1
+    }
+    private Direction initialShipDirection = Direction.Right;
 
     void Awake()
     {
@@ -23,12 +31,13 @@ public class ScrollingBackground : MonoBehaviour
         {
             Destroy(gameObject);
         }
-        
+
     }
 
     private void Start()
     {
         spriteWidth = spriteRenderer.bounds.size.x;
+        cameraInitialPosition = mainCamera.transform.position;
     }
 
     void Update()
@@ -39,26 +48,25 @@ public class ScrollingBackground : MonoBehaviour
         // Scroll the background horizontally
         float movement = scrollSpeed * Time.deltaTime * (scrollingToRight ? 1 : -1);
         transform.position += Vector3.right * movement;
-
         WrapBackground();
     }
 
     // Check if any background part needs to be wrapped
     private void WrapBackground()
-    {      
+    {
         for (int i = 0; i < backgroundParts.Length; i++)
         {
             Transform part = backgroundParts[i];
 
             // Wrap around to the right
-            if (scrollingToRight && part.position.x > mainCamera.transform.position.x + spriteWidth)
+            if (part.position.x > mainCamera.transform.position.x + spriteWidth)
             {
                 Vector3 newPosition = part.position;
                 newPosition.x -= spriteWidth * backgroundParts.Length;
                 part.position = newPosition;
             }
             // Wrap around to the left
-            else if (!scrollingToRight && part.position.x < mainCamera.transform.position.x - spriteWidth)
+            else if (part.position.x < mainCamera.transform.position.x - spriteWidth) 
             {
                 Vector3 newPosition = part.position;
                 newPosition.x += spriteWidth * backgroundParts.Length;
@@ -70,24 +78,50 @@ public class ScrollingBackground : MonoBehaviour
     // Start smooth wrapping with camera transition when ship direction is changed
     public void StartSmoothWrap(bool faceRight, float duration)
     {
+        // Stop the currently running wrap coroutine, if any
+        if (currentWrapCoroutine != null)
+        {
+            StopCoroutine(currentWrapCoroutine);
+        }
+
         isWrapping = true;
-        StartCoroutine(SmoothWrapCoroutine(faceRight, duration, () => isWrapping = false));
+        currentWrapCoroutine = StartCoroutine(SmoothWrapCoroutine(faceRight, duration, () => {
+            isWrapping = false;
+            currentWrapCoroutine = null;
+            cameraInitialPosition = mainCamera.transform.position;
+            initialShipDirection = faceRight ? Direction.Right : Direction.Left;
+        }));
     }
 
     // Smoothly wrap the background to position the ship on the other side with camera movement
     private IEnumerator SmoothWrapCoroutine(bool shipFaceRight, float duration, System.Action onComplete)
     {
+        //float orthographicWidth = mainCamera.orthographicSize * mainCamera.aspect * 2f;
+        float orthographicWidth = 16f; // TO FIX
+        Vector3 cameraTargetPosition = Vector3.zero;
         Vector3 cameraStartPosition = mainCamera.transform.position;
-        Vector3 cameraTargetPosition = cameraStartPosition;
-        cameraTargetPosition.x += shipFaceRight ? 16f : -16f;
+        Direction currentShipDirection;
 
+        currentShipDirection = shipFaceRight ? Direction.Right : Direction.Left;
+
+        if (currentShipDirection == initialShipDirection) 
+        { 
+            cameraTargetPosition = cameraInitialPosition;
+        }
+        else 
+        {
+            cameraTargetPosition = cameraInitialPosition;
+            cameraTargetPosition.x += shipFaceRight ? orthographicWidth : -orthographicWidth;
+        }
+
+        float distance = Vector3.Distance(cameraTargetPosition, cameraStartPosition);
         Vector3[] backgroundStartPositions = new Vector3[backgroundParts.Length];
         Vector3[] backgroundTargetPositions = new Vector3[backgroundParts.Length];
 
         for (int i = 0; i < backgroundParts.Length; i++)
         {
             backgroundStartPositions[i] = backgroundParts[i].position;
-            backgroundTargetPositions[i] = backgroundParts[i].position + Vector3.right * (shipFaceRight ? -spriteWidth : spriteWidth);
+            backgroundTargetPositions[i] = backgroundParts[i].position + Vector3.right * (shipFaceRight ? -distance : distance);
         }
 
         float elapsedTime = 0f;
@@ -96,24 +130,12 @@ public class ScrollingBackground : MonoBehaviour
             elapsedTime += Time.deltaTime;
             float t = Mathf.Clamp01(elapsedTime / duration);
             mainCamera.transform.position = Vector3.Lerp(cameraStartPosition, cameraTargetPosition, t);
-            
+
             for (int i = 0; i < backgroundParts.Length; i++)
             {
                 backgroundParts[i].position = Vector3.Lerp(backgroundStartPositions[i], backgroundTargetPositions[i], t);
                 Transform part = backgroundParts[i];
-
-                if (!scrollingToRight && part.position.x > mainCamera.transform.position.x + spriteWidth)
-                {
-                    Vector3 newPosition = part.position;
-                    newPosition.x -= spriteWidth * backgroundParts.Length;
-                    part.position = newPosition;
-                }
-                else if (scrollingToRight && part.position.x < mainCamera.transform.position.x - spriteWidth)
-                {
-                    Vector3 newPosition = part.position;
-                    newPosition.x += spriteWidth * backgroundParts.Length;
-                    part.position = newPosition;
-                }
+                WrapBackground();
             }
             yield return null;
         }

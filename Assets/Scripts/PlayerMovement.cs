@@ -21,13 +21,13 @@ public class PlayerMovement : MonoBehaviour
     }
 
     private void HandleInput()
-    {      
+    {
         verticalInput = Input.GetAxis("Vertical");
     }
 
     private void MovePlayer()
     {
-        velocity.y = Mathf.Lerp(velocity.y, verticalInput * moveSpeed, Time.deltaTime );
+        velocity.y = Mathf.Lerp(velocity.y, verticalInput * moveSpeed, Time.deltaTime);
         transform.Translate(velocity * Time.deltaTime);
 
         // Clamp vertical movement to screen boundaries
@@ -45,7 +45,7 @@ public class PlayerMovement : MonoBehaviour
             FlipSprite();
             StartWrap();
         }
-        else if (horizontalInput < 0 && facingRight )
+        else if (horizontalInput < 0 && facingRight)
         {
             facingRight = false;
             FlipSprite();
