@@ -6,10 +6,12 @@ public class ScrollingBackground : MonoBehaviour
     public static ScrollingBackground Instance { get; private set; }
     public float scrollSpeed = 2f; // Scrolling speed
     public Transform[] backgroundParts;
+    public Transform GameWorld;
     public SpriteRenderer spriteRenderer;
     public Camera mainCamera; // Main camera reference
 
-    private float spriteWidth; // Width of each sprite
+    public float spriteWidth; // Width of each background sprite
+
     private bool scrollingToRight = false; // Initially scrolling to the left
     private bool isWrapping = false;
     private Coroutine currentWrapCoroutine = null;
@@ -115,14 +117,10 @@ public class ScrollingBackground : MonoBehaviour
         }
 
         float distance = Vector3.Distance(cameraTargetPosition, cameraStartPosition);
-        Vector3[] backgroundStartPositions = new Vector3[backgroundParts.Length];
-        Vector3[] backgroundTargetPositions = new Vector3[backgroundParts.Length];
+        
 
-        for (int i = 0; i < backgroundParts.Length; i++)
-        {
-            backgroundStartPositions[i] = backgroundParts[i].position;
-            backgroundTargetPositions[i] = backgroundParts[i].position + Vector3.right * (shipFaceRight ? -distance : distance);
-        }
+        Vector3 gameWorldStartPosition = GameWorld.position;
+        Vector3 gameWorldTargetPosition = GameWorld.position + Vector3.right * (shipFaceRight ? -distance : distance);
 
         float elapsedTime = 0f;
         while (elapsedTime < duration)
@@ -131,12 +129,9 @@ public class ScrollingBackground : MonoBehaviour
             float t = Mathf.Clamp01(elapsedTime / duration);
             mainCamera.transform.position = Vector3.Lerp(cameraStartPosition, cameraTargetPosition, t);
 
-            for (int i = 0; i < backgroundParts.Length; i++)
-            {
-                backgroundParts[i].position = Vector3.Lerp(backgroundStartPositions[i], backgroundTargetPositions[i], t);
-                Transform part = backgroundParts[i];
-                WrapBackground();
-            }
+            GameWorld.position = Vector3.Lerp(gameWorldStartPosition, gameWorldTargetPosition, t);
+            WrapBackground();
+
             yield return null;
         }
 
